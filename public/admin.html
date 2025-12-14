@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>功课数据管理系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body { background: linear-gradient(135deg, #1a2980, #26d0ce); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; background: white; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); overflow: hidden; }
+        .header { background: linear-gradient(90deg, #2c3e50, #4a6491); color: white; padding: 25px; text-align: center; }
+        .header h1 { font-size: 32px; margin-bottom: 10px; }
+        .content { padding: 30px; }
+        .controls { background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; color: #333; }
+        input, select, button { padding: 10px; border: 2px solid #ddd; border-radius: 5px; font-size: 14px; }
+        button { cursor: pointer; transition: all 0.3s; border: none; }
+        button:hover { opacity: 0.9; transform: translateY(-2px); }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-success { background: #2ecc71; color: white; }
+        .btn-warning { background: #f39c12; color: white; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-info { background: #9b59b6; color: white; }
+        .btn-secondary { background: #95a5a6; color: white; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 20px; }
+        .stat-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-left: 5px solid #3498db; }
+        .stat-card h3 { color: #2c3e50; margin-bottom: 10px; font-size: 16px; }
+        .stat-card .value { font-size: 28px; font-weight: bold; color: #3498db; }
+        .stat-card .label { font-size: 14px; color: #7f8c8d; }
+        .alert { padding: 15px; border-radius: 8px; margin: 15px 0; display: none; }
+        .alert-success { background: #d4edda; color: #155724; }
+        .alert-error { background: #f8d7da; color: #721c24; }
+        .alert-info { background: #d1ecf1; color: #0c5460; }
+        .loading { display: none; text-align: center; padding: 20px; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 2s linear infinite; margin: 0 auto 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .data-table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
+        .data-table th, .data-table td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        .data-table th { background: #2c3e50; color: white; font-weight: 600; }
+        .data-table tr:nth-child(even) { background: #f8f9fa; }
+        .data-table tr:hover { background: #e3f2fd; }
+        .action-buttons button { margin: 2px; padding: 5px 10px; font-size: 12px; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+        .modal-content { background: white; margin: 5% auto; padding: 30px; border-radius: 10px; width: 80%; max-width: 600px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h2 { color: #2c3e50; }
+        .close { font-size: 28px; cursor: pointer; color: #aaa; }
+        .close:hover { color: #000; }
+        .pagination { display: flex; justify-content: center; margin-top: 20px; gap: 5px; }
+        .pagination button { padding: 8px 12px; }
+        .active-page { background: #3498db; color: white; }
+        .view-mode { margin-bottom: 10px; }
+        .view-mode button { margin-right: 10px; }
+        .view-mode .active { background: #2c3e50; }
+        .export-options { margin-top: 20px; }
+        .export-options button { margin-right: 10px; }
+        .nav-links { text-align: center; margin: 20px 0; }
+        .nav-links a { color: #4CAF50; text-decoration: none; font-weight: bold; padding: 10px 20px; border: 2px solid #4CAF50; border-radius: 5px; margin: 0 10px; }
+        .nav-links a:hover { background: #4CAF50; color: white; }
+    </style>
+</head>
+<body>
+    <div class="nav-links">
+        <a href="/">提交页面</a>
+        <a href="/manage">管理页面</a>
+    </div>
+    
+    <div class="container">
+        <div class="header">
+            <h1>📊 功课数据管理系统</h1>
+            <p>云端数据管理 - Node.js + MongoDB + Render</p>
+        </div>
+        
+        <div class="content">
+            <!-- 统计卡片 -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>📈 总记录数</h3>
+                    <div class="value" id="totalRecords">0</div>
+                    <div class="label">条功课记录</div>
+                </div>
+                <div class="stat-card">
+                    <h3>📅 今日提交</h3>
+                    <div class="value" id="todayRecords">0</div>
+                    <div class="label">条记录</div>
+                </div>
+                <div class="stat-card">
+                    <h3>👥 参与人数</h3>
+                    <div class="value" id="totalPeople">0</div>
+                    <div class="label">人</div>
+                </div>
+                <div class="stat-card">
+                    <h3>📚 经典总数</h3>
+                    <div class="value" id="totalClassics">0</div>
+                    <div class="label">遍</div>
+                </div>
+            </div>
+            
+            <!-- 控制面板 -->
+            <div class="controls">
+                <div class="form-group">
+                    <label>搜索姓名</label>
+                    <input type="text" id="searchName" placeholder="输入姓名搜索...">
+                </div>
+                <div class="form-group">
+                    <label>搜索日期</label>
+                    <input type="date" id="searchDate">
+                </div>
+                <div class="form-group">
+                    <label>排序方式</label>
+                    <select id="sortBy">
+                        <option value="createdAt_desc">最新提交</option>
+                        <option value="date_desc">最新日期</option>
+                        <option value="name_asc">姓名A-Z</option>
+                        <option value="totalClassics_desc">经典总数降序</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>每页显示</label>
+                    <select id="pageSize">
+                        <option value="10">10条</option>
+                        <option value="20" selected>20条</option>
+                        <option value="50">50条</option>
+                        <option value="100">100条</option>
+                    </select>
+                </div>
+                <div class="form-group" style="display: flex; align-items: flex-end;">
+                    <button onclick="searchRecords()" class="btn-primary">🔍 搜索</button>
+                    <button onclick="resetSearch()" class="btn-secondary">🔄 重置</button>
+                </div>
+            </div>
+            
+            <!-- 视图模式 -->
+            <div class="view-mode">
+                <button onclick="setViewMode('table')" class="btn-info active">📋 表格视图</button>
+                <button onclick="setViewMode('cards')" class="btn-info">🃏 卡片视图</button>
+                <button onclick="showStats()" class="btn-success">📊 详细统计</button>
+                <button onclick="exportData()" class="btn-warning">📤 导出数据</button>
+            </div>
+            
+            <!-- 加载动画 -->
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <p>加载数据中...</p>
+            </div>
+            
+            <!-- 消息提示 -->
+            <div id="message" class="alert"></div>
+            
+            <!-- 数据表格 -->
+            <div id="dataContainer">
+                <div id="tableView">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>操作</th>
+                                <th>日期</th>
+                                <th>姓名</th>
+                                <th>九字禅</th>
+                                <th>拜忏文</th>
+                                <th>静禅</th>
+                                <th>动禅</th>
+                                <th>金刚经</th>
+                                <th>阿弥陀经</th>
+                                <th>普门品</th>
+                                <th>普贤品</th>
+                                <th>地藏经</th>
+                                <th>经典总数</th>
+                                <th>备注</th>
+                                <th>提交时间</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dataTableBody">
+                            <!-- 数据将通过JS填充 -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="cardsView" style="display: none;">
+                    <!-- 卡片视图将通过JS填充 -->
+                </div>
+            </div>
+            
+            <!-- 分页 -->
+            <div class="pagination" id="pagination">
+                <!-- 分页按钮将通过JS生成 -->
+            </div>
+            
+            <!-- 批量操作 -->
+            <div class="controls" style="margin-top: 20px;">
+                <button onclick="selectAll()" class="btn-secondary">全选</button>
+                <button onclick="deselectAll()" class="btn-secondary">取消全选</button>
+                <button onclick="deleteSelected()" class="btn-danger">删除选中</button>
+                <button onclick="backupData()" class="btn-success">备份数据</button>
+            </div>
+            
+            <!-- 导出选项 -->
+            <div class="export-options">
+                <h3>导出数据</h3>
+                <button onclick="exportToCSV()" class="btn-primary">📄 导出为CSV</button>
+                <button onclick="exportToJSON()" class="btn-primary">📦 导出为JSON</button>
+                <button onclick="exportToExcel()" class="btn-primary">📊 导出为Excel</button>
+                <button onclick="printData()" class="btn-secondary">🖨️ 打印数据</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 编辑模态框 -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✏️ 编辑记录</h2>
+                <span class="close" onclick="closeModal()">&times;</span>
+            </div>
+            <div id="editFormContainer">
+                <!-- 编辑表单将通过JS动态生成 -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- 统计模态框 -->
+    <div id="statsModal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h2>📊 详细统计报告</h2>
+                <span class="close" onclick="closeStatsModal()">&times;</span>
+            </div>
+            <div id="statsContent">
+                <!-- 统计内容将通过JS动态生成 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API配置 - 修改这里
+        // 原代码：const API_BASE_URL = 'https://homework-api.nanmo009.workers.dev/api';
+        // 改为使用相对路径，因为管理页面和API在同一个域名下
+        const API_BASE_URL = '/api';
+        
+        // 全局变量
+        let allRecords = [];
+        let currentRecords = [];
+        let currentPage = 1;
+        let totalPages = 1;
+        let pageSize = 20;
+        let viewMode = 'table';
+        let selectedRecords = new Set();
+        
+        // 页面加载
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStats();
+            loadRecords();
+            
+            // 设置默认日期为今天
+            document.getElementById('searchDate').value = new Date().toISOString().split('T')[0];
+            
+            // 监听页面大小变化
+            document.getElementById('pageSize').addEventListener('change', function() {
+                pageSize = parseInt(this.value);
+                currentPage = 1;
+                loadRecords();
+            });
+            
+            // 监听排序变化
+            document.getElementById('sortBy').addEventListener('change', function() {
+                loadRecords();
+            });
+        });
+        
+        // 加载统计信息
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/stats`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const stats = data.stats;
+                    
+                    // 更新统计卡片
+                    document.getElementById('totalRecords').textContent = stats.totalRecords;
+                    document.getElementById('todayRecords').textContent = stats.todayRecords;
+                    document.getElementById('totalPeople').textContent = stats.nameStats.length;
+                    
+                    // 计算经典总数
+                    const classics = stats.classicsStats;
+                    const totalClassics = (classics.totalDiamond || 0) + 
+                                         (classics.totalAmitabha || 0) + 
+                                         (classics.totalGuanyin || 0) + 
+                                         (classics.totalPuxian || 0) + 
+                                         (classics.totalDizang || 0);
+                    
+                    document.getElementById('totalClassics').textContent = totalClassics;
+                }
+            } catch (error) {
+                console.error('加载统计失败:', error);
+                showMessage('连接服务器失败，请检查网络连接', 'error');
+            }
+        }
+        
+        // 加载记录
+        async function loadRecords() {
+            showLoading(true);
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/records`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    allRecords = data.data;
+                    applyFiltersAndPagination();
+                } else {
+                    showMessage('加载数据失败: ' + (data.error || '未知错误'), 'error');
+                }
+            } catch (error) {
+                console.error('加载记录失败:', error);
+                showMessage('连接服务器失败，请检查网络连接', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        // 应用过滤和分页
+        function applyFiltersAndPagination() {
+            // 获取搜索条件
+            const searchName = document.getElementById('searchName').value.toLowerCase();
+            const searchDate = document.getElementById('searchDate').value;
+            const sortBy = document.getElementById('sortBy').value;
+            
+            // 过滤记录
+            currentRecords = allRecords.filter(record => {
+                const nameMatch = !searchName || record.name.toLowerCase().includes(searchName);
+                const dateMatch = !searchDate || record.date === searchDate;
+                return nameMatch && dateMatch;
+            });
+            
+            // 排序
+            sortRecords(sortBy);
+            
+            // 计算分页
+            totalPages = Math.ceil(currentRecords.length / pageSize);
+            
+            // 确保当前页有效
+            if (currentPage > totalPages) currentPage = 1;
+            if (currentPage < 1) currentPage = 1;
+            
+            // 显示数据
+            displayRecords();
+            
+            // 更新分页
+            updatePagination();
+        }
+        
+        // 排序记录
+        function sortRecords(sortBy) {
+            switch(sortBy) {
+                case 'createdAt_desc':
+                    currentRecords.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                    break;
+                case 'date_desc':
+                    currentRecords.sort((a, b) => new Date(b.date) - new Date(a.date));
+                    break;
+                case 'name_asc':
+                    currentRecords.sort((a, b) => a.name.localeCompare(b.name));
+                    break;
+                case 'totalClassics_desc':
+                    currentRecords.sort((a, b) => {
+                        const totalA = a.diamond + a.amitabha + a.guanyin + a.puxian + a.dizang;
+                        const totalB = b.diamond + b.amitabha + b.guanyin + b.puxian + b.dizang;
+                        return totalB - totalA;
+                    });
+                    break;
+            }
+        }
+        
+        // 显示记录
+        function displayRecords() {
+            const startIndex = (currentPage - 1) * pageSize;
+            const endIndex = startIndex + pageSize;
+            const pageRecords = currentRecords.slice(startIndex, endIndex);
+            
+            if (viewMode === 'table') {
+                displayTableView(pageRecords);
+            } else {
+                displayCardsView(pageRecords);
+            }
+        }
+        
+        // 显示表格视图
+        function displayTableView(records) {
+            const tbody = document.getElementById('dataTableBody');
+            
+            if (records.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="15" style="text-align: center; padding: 50px;">
+                            📭 暂无数据
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            let html = '';
+            
+            records.forEach(record => {
+                const totalClassics = record.diamond + record.amitabha + record.guanyin + 
+                                     record.puxian + record.dizang;
+                
+                const isSelected = selectedRecords.has(record._id);
+                
+                html += `
+                    <tr data-id="${record._id}" class="${isSelected ? 'selected' : ''}">
+                        <td>
+                            <input type="checkbox" class="record-checkbox" 
+                                   data-id="${record._id}" 
+                                   ${isSelected ? 'checked' : ''}
+                                   onchange="toggleSelection('${record._id}')">
+                            <button onclick="editRecord('${record._id}')" class="btn-warning" style="padding: 5px;">✏️</button>
+                            <button onclick="deleteRecord('${record._id}')" class="btn-danger" style="padding: 5px;">🗑️</button>
+                        </td>
+                        <td>${record.date}</td>
+                        <td>${record.name}</td>
+                        <td>${record.nineWord}</td>
+                        <td>${record.buddhaWorship}</td>
+                        <td>${record.quietZen}</td>
+                        <td>${record.activeZen}</td>
+                        <td>${record.diamond}</td>
+                        <td>${record.amitabha}</td>
+                        <td>${record.guanyin}</td>
+                        <td>${record.puxian}</td>
+                        <td>${record.dizang}</td>
+                        <td><strong>${totalClassics}</strong></td>
+                        <td>${record.remark || ''}</td>
+                        <td>${formatDateTime(record.submitTime)}</td>
+                    </tr>
+                `;
+            });
+            
+            tbody.innerHTML = html;
+        }
+        
+        // 显示卡片视图
+        function displayCardsView(records) {
+            const container = document.getElementById('cardsView');
+            
+            if (records.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 50px; color: #7f8c8d;">
+                        📭 暂无数据
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">';
+            
+            records.forEach(record => {
+                const totalClassics = record.diamond + record.amitabha + record.guanyin + 
+                                     record.puxian + record.dizang;
+                
+                html += `
+                    <div class="stat-card" data-id="${record._id}">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h3>${record.name}</h3>
+                            <input type="checkbox" class="record-checkbox" 
+                                   data-id="${record._id}" 
+                                   onchange="toggleSelection('${record._id}')">
+                        </div>
+                        <div style="color: #7f8c8d; margin-bottom: 10px;">${record.date}</div>
+                        
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 15px;">
+                            <div>九字禅: <strong>${record.nineWord}</strong></div>
+                            <div>拜忏文: <strong>${record.buddhaWorship}</strong></div>
+                            <div>静禅: <strong>${record.quietZen}分</strong></div>
+                            <div>动禅: <strong>${record.activeZen}分</strong></div>
+                        </div>
+                        
+                        <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
+                            <div style="font-weight: bold; margin-bottom: 5px;">经典诵读:</div>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; font-size: 12px;">
+                                <div>金刚经: ${record.diamond}</div>
+                                <div>阿弥陀经: ${record.amitabha}</div>
+                                <div>普门品: ${record.guanyin}</div>
+                                <div>普贤品: ${record.puxian}</div>
+                                <div>地藏经: ${record.dizang}</div>
+                                <div><strong>总计: ${totalClassics}</strong></div>
+                            </div>
+                        </div>
+                        
+                        ${record.remark ? `<div style="font-style: italic; color: #666;">${record.remark}</div>` : ''}
+                        
+                        <div style="display: flex; justify-content: space-between; margin-top: 15px; font-size: 12px; color: #95a5a6;">
+                            <div>${formatDateTime(record.submitTime)}</div>
+                            <div>
+                                <button onclick="editRecord('${record._id}')" class="btn-warning" style="padding: 3px 8px; font-size: 11px;">编辑</button>
+                                <button onclick="deleteRecord('${record._id}')" class="btn-danger" style="padding: 3px 8px; font-size: 11px;">删除</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+        
+        // 更新分页
+        function updatePagination() {
+            const pagination = document.getElementById('pagination');
+            
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+            
+            let html = '';
+            
+            // 上一页按钮
+            if (currentPage > 1) {
+                html += `<button onclick="changePage(${currentPage - 1})" class="btn-secondary">上一页</button>`;
+            }
+            
+            // 页码按钮
+            const maxVisiblePages = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+            
+            if (endPage - startPage + 1 < maxVisiblePages) {
+                startPage = Math.max(1, endPage - maxVisiblePages + 1);
+            }
+            
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<button onclick="changePage(${i})" class="${i === currentPage ? 'active-page' : 'btn-secondary'}">${i}</button>`;
+            }
+            
+            // 下一页按钮
+            if (currentPage < totalPages) {
+                html += `<button onclick="changePage(${currentPage + 1})" class="btn-secondary">下一页</button>`;
+            }
+            
+            pagination.innerHTML = html;
+        }
+        
+        // 搜索记录
+        function searchRecords() {
+            currentPage = 1;
+            applyFiltersAndPagination();
+        }
+        
+        // 重置搜索
+        function resetSearch() {
+            document.getElementById('searchName').value = '';
+            document.getElementById('searchDate').value = '';
+            document.getElementById('sortBy').value = 'createdAt_desc';
+            currentPage = 1;
+            applyFiltersAndPagination();
+        }
+        
+        // 切换视图模式
+        function setViewMode(mode) {
+            viewMode = mode;
+            
+            // 更新按钮状态
+            document.querySelectorAll('.view-mode button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // 显示对应视图
+            if (mode === 'table') {
+                document.getElementById('tableView').style.display = 'block';
+                document.getElementById('cardsView').style.display = 'none';
+            } else {
+                document.getElementById('tableView').style.display = 'none';
+                document.getElementById('cardsView').style.display = 'block';
+            }
+            
+            displayRecords();
+        }
+        
+        // 切换选择
+        function toggleSelection(recordId) {
+            if (selectedRecords.has(recordId)) {
+                selectedRecords.delete(recordId);
+            } else {
+                selectedRecords.add(recordId);
+            }
+            
+            // 更新显示
+            const row = document.querySelector(`[data-id="${recordId}"]`);
+            if (row) {
+                row.classList.toggle('selected');
+            }
+        }
+        
+        // 全选
+        function selectAll() {
+            const startIndex = (currentPage - 1) * pageSize;
+            const endIndex = startIndex + pageSize;
+            const pageRecords = currentRecords.slice(startIndex, endIndex);
+            
+            pageRecords.forEach(record => {
+                selectedRecords.add(record._id);
+            });
+            
+            // 更新复选框
+            document.querySelectorAll('.record-checkbox').forEach(checkbox => {
+                checkbox.checked = true;
+            });
+            
+            // 更新显示
+            displayRecords();
+        }
+        
+        // 取消全选
+        function deselectAll() {
+            selectedRecords.clear();
+            
+            // 更新复选框
+            document.querySelectorAll('.record-checkbox').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            
+            // 更新显示
+            displayRecords();
+        }
+        
+        // 删除选中记录
+        async function deleteSelected() {
+            if (selectedRecords.size === 0) {
+                showMessage('请先选择要删除的记录', 'info');
+                return;
+            }
+            
+            if (!confirm(`确定要删除选中的 ${selectedRecords.size} 条记录吗？`)) {
+                return;
+            }
+            
+            showLoading(true);
+            
+            try {
+                let deletedCount = 0;
+                for (const id of selectedRecords) {
+                    const result = await deleteRecordFromServer(id);
+                    if (result.success) deletedCount++;
+                }
+                
+                selectedRecords.clear();
+                showMessage(`成功删除 ${deletedCount} 条记录`, 'success');
+                loadRecords();
+                loadStats();
+                
+            } catch (error) {
+                console.error('删除失败:', error);
+                showMessage('删除记录失败: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        // 从服务器删除记录
+        async function deleteRecordFromServer(id) {
+            const response = await fetch(`${API_BASE_URL}/delete`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ id }),
+            });
+            
+            return await response.json();
+        }
+        
+        // 删除单条记录
+        async function deleteRecord(id) {
+            if (!confirm('确定要删除这条记录吗？')) {
+                return;
+            }
+            
+            try {
+                const data = await deleteRecordFromServer(id);
+                
+                if (data.success) {
+                    showMessage('记录已删除', 'success');
+                    loadRecords();
+                    loadStats();
+                } else {
+                    showMessage(data.error || '删除失败', 'error');
+                }
+            } catch (error) {
+                console.error('删除失败:', error);
+                showMessage('删除失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 编辑记录
+        async function editRecord(id) {
+            const record = allRecords.find(r => r._id === id);
+            if (!record) return;
+            
+            // 生成编辑表单
+            const formHtml = `
+                <form id="editRecordForm">
+                    <input type="hidden" id="editId" value="${record._id}">
+                    
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                        <div class="form-group">
+                            <label>日期 *</label>
+                            <input type="date" id="editDate" value="${record.date}" required>
+                        </div>
+                        <div class="form-group">
+                            <label>姓名 *</label>
+                            <input type="text" id="editName" value="${record.name}" required>
+                        </div>
+                        <div class="form-group">
+                            <label>九字禅（声）</label>
+                            <input type="number" id="editNineWord" value="${record.nineWord}" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label>礼佛拜忏文（遍）</label>
+                            <input type="number" id="editBuddhaWorship" value="${record.buddhaWorship}" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label>静禅（分钟）</label>
+                            <input type="number" id="editQuietZen" value="${record.quietZen}" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label>动禅（分钟）</label>
+                            <input type="number" id="editActiveZen" value="${record.activeZen}" min="0">
+                        </div>
+                    </div>
+                    
+                    <div style="margin: 15px 0;">
+                        <h4>经典诵读（遍）</h4>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                            <div>金刚经: <input type="number" id="editDiamond" value="${record.diamond}" min="0" max="10" style="width: 60px;"></div>
+                            <div>阿弥陀经: <input type="number" id="editAmitabha" value="${record.amitabha}" min="0" max="10" style="width: 60px;"></div>
+                            <div>普门品: <input type="number" id="editGuanyin" value="${record.guanyin}" min="0" max="10" style="width: 60px;"></div>
+                            <div>普贤品: <input type="number" id="editPuxian" value="${record.puxian}" min="0" max="10" style="width: 60px;"></div>
+                            <div>地藏经: <input type="number" id="editDizang" value="${record.dizang}" min="0" max="10" style="width: 60px;"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>备注</label>
+                        <textarea id="editRemark" rows="3" style="width: 100%;">${record.remark || ''}</textarea>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; margin-top: 20px;">
+                        <button type="button" onclick="submitEdit()" class="btn-success">保存修改</button>
+                        <button type="button" onclick="closeModal()" class="btn-secondary">取消</button>
+                    </div>
+                </form>
+            `;
+            
+            document.getElementById('editFormContainer').innerHTML = formHtml;
+            document.getElementById('editModal').style.display = 'block';
+        }
+        
+        // 提交编辑
+        async function submitEdit() {
+            const id = document.getElementById('editId').value;
+            const updateData = {
+                date: document.getElementById('editDate').value,
+                name: document.getElementById('editName').value,
+                nineWord: parseInt(document.getElementById('editNineWord').value) || 0,
+                buddhaWorship: parseInt(document.getElementById('editBuddhaWorship').value) || 0,
+                quietZen: parseInt(document.getElementById('editQuietZen').value) || 0,
+                activeZen: parseInt(document.getElementById('editActiveZen').value) || 0,
+                diamond: parseInt(document.getElementById('editDiamond').value) || 0,
+                amitabha: parseInt(document.getElementById('editAmitabha').value) || 0,
+                guanyin: parseInt(document.getElementById('editGuanyin').value) || 0,
+                puxian: parseInt(document.getElementById('editPuxian').value) || 0,
+                dizang: parseInt(document.getElementById('editDizang').value) || 0,
+                remark: document.getElementById('editRemark').value,
+            };
+            
+            if (!updateData.date || !updateData.name) {
+                showMessage('日期和姓名为必填项', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/update`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ id, ...updateData }),
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage('记录更新成功', 'success');
+                    closeModal();
+                    loadRecords();
+                    loadStats();
+                } else {
+                    showMessage(data.error || '更新失败', 'error');
+                }
+            } catch (error) {
+                console.error('更新失败:', error);
+                showMessage('更新失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 显示详细统计
+        async function showStats() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/stats`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const stats = data.stats;
+                    let html = `
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px;">
+                            <div class="stat-card">
+                                <h3>📈 总体统计</h3>
+                                <p>总记录数: <strong>${stats.totalRecords}</strong></p>
+                                <p>今日提交: <strong>${stats.todayRecords}</strong></p>
+                                <p>参与人数: <strong>${stats.nameStats.length}</strong></p>
+                            </div>
+                            <div class="stat-card">
+                                <h3>📚 经典统计</h3>
+                                <p>金刚经: <strong>${stats.classicsStats.totalDiamond || 0} 遍</strong></p>
+                                <p>阿弥陀经: <strong>${stats.classicsStats.totalAmitabha || 0} 遍</strong></p>
+                                <p>普门品: <strong>${stats.classicsStats.totalGuanyin || 0} 遍</strong></p>
+                                <p>普贤品: <strong>${stats.classicsStats.totalPuxian || 0} 遍</strong></p>
+                                <p>地藏经: <strong>${stats.classicsStats.totalDizang || 0} 遍</strong></p>
+                            </div>
+                        </div>
+                        
+                        <h3>👥 个人统计排名</h3>
+                        <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                            <thead>
+                                <tr>
+                                    <th style="border: 1px solid #ddd; padding: 8px;">排名</th>
+                                    <th style="border: 1px solid #ddd; padding: 8px;">姓名</th>
+                                    <th style="border: 1px solid #ddd; padding: 8px;">提交次数</th>
+                                    <th style="border: 1px solid #ddd; padding: 8px;">最后提交</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+                    
+                    stats.nameStats.forEach((person, index) => {
+                        html += `
+                            <tr>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${index + 1}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${person._id}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${person.count} 次</td>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${formatDateTime(person.lastSubmit)}</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    html += `
+                            </tbody>
+                        </table>
+                    `;
+                    
+                    document.getElementById('statsContent').innerHTML = html;
+                    document.getElementById('statsModal').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('加载统计失败:', error);
+                showMessage('加载统计失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 导出数据
+        function exportData() {
+            // 显示导出选项
+            const exportDiv = document.querySelector('.export-options');
+            exportDiv.style.display = exportDiv.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        // 导出为CSV
+        function exportToCSV() {
+            if (allRecords.length === 0) {
+                showMessage('没有数据可导出', 'info');
+                return;
+            }
+            
+            let csv = '日期,姓名,九字禅(声),拜忏文(遍),静禅(分钟),动禅(分钟),金刚经,阿弥陀经,普门品,普贤品,地藏经,经典总数,备注,提交时间\n';
+            
+            allRecords.forEach(record => {
+                const total = record.diamond + record.amitabha + record.guanyin + 
+                             record.puxian + record.dizang;
+                csv += `${record.date},${record.name},${record.nineWord},${record.buddhaWorship},${record.quietZen},${record.activeZen},${record.diamond},${record.amitabha},${record.guanyin},${record.puxian},${record.dizang},${total},"${record.remark || ''}",${record.submitTime}\n`;
+            });
+            
+            downloadFile(csv, '功课记录.csv', 'text/csv');
+        }
+        
+        // 导出为JSON
+        function exportToJSON() {
+            if (allRecords.length === 0) {
+                showMessage('没有数据可导出', 'info');
+                return;
+            }
+            
+            const json = JSON.stringify(allRecords, null, 2);
+            downloadFile(json, '功课记录.json', 'application/json');
+        }
+        
+        // 导出为Excel（简化为CSV）
+        function exportToExcel() {
+            exportToCSV();
+        }
+        
+        // 打印数据
+        function printData() {
+            window.print();
+        }
+        
+        // 备份数据
+        function backupData() {
+            exportToJSON();
+            showMessage('数据备份已开始下载', 'success');
+        }
+        
+        // 下载文件
+        function downloadFile(content, fileName, contentType) {
+            const blob = new Blob(['\uFEFF' + content], { type: contentType });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+        
+        // 辅助函数
+        function formatDateTime(dateTime) {
+            if (!dateTime) return '';
+            const date = new Date(dateTime);
+            return date.toLocaleString('zh-CN');
+        }
+        
+        function changePage(page) {
+            currentPage = page;
+            applyFiltersAndPagination();
+        }
+        
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+        
+        function showMessage(message, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = message;
+            messageDiv.className = `alert alert-${type}`;
+            messageDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 3000);
+        }
+        
+        function closeModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }
+        
+        function closeStatsModal() {
+            document.getElementById('statsModal').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
