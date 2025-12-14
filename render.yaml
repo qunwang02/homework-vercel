@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: donation-collection-system
+    env: node
+    buildCommand: |
+      echo "正在构建应用..."
+      npm install
+      echo "构建完成！"
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: MONGODB_URI
+        sync: false  # 需要在Render控制台中手动设置
+    healthCheckPath: /health
+    autoDeploy: true
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1
