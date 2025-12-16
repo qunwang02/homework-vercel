@@ -100,6 +100,12 @@ app.get('/api/test', async (req, res) => {
   }
 });
 
+// 立即加载路由，避免延迟
+const routes = require('./routes');
+app.use('/api', routes); // 先注册API路由
+app.use(express.static(path.join(__dirname, '../public'))); // 后注册静态文件服务
+console.log('✅ 路由已加载');
+
 // 主页路由
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
@@ -109,12 +115,6 @@ app.get('/', (req, res) => {
 app.get('/manage', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/admin.html'));
 });
-
-// 立即加载路由，避免延迟
-const routes = require('./routes');
-app.use('/api', routes); // 先注册API路由
-app.use(express.static(path.join(__dirname, '../public'))); // 后注册静态文件服务
-console.log('✅ 路由已加载');
 
 // 404处理
 app.use((req, res) => {
