@@ -7,6 +7,32 @@ const rateLimit = require('express-rate-limit');
 const database = require('./database'); // 立即导入
 
 const app = express();
+import parseForwarded from 'forwarded-parse'
+import { rateLimit, ipKeyGenerator } from 'express-rate-limit'
+
+// ...
+
+const NUMBER_OF_PROXIES_TO_TRUST = 1
+
+app.use(
+	rateLimit({
+		keyGenerator: (req, res) => {
+			let ip = req.ip
+			try {
+				const forwards = parseForwarded(req.headers.forwarded)
+				ip = forwards[forwards.length - NUMBER_OF_PROXIES_TO_TRUST].for
+			} catch (ex) {
+				console.error(
+					`Error parsing Forwarded header ${req.headers.forwarded} from ${req.ip}:`,
+					ex,
+				)
+			}
+			return ipKeyGenerator(ip)
+		},
+		// ...
+	}),
+)
+
 
 // 或者对于Render平台，建议使用：
 app.set('trust proxy', true); // 最简单有效
