@@ -7,8 +7,6 @@ const rateLimit = require('express-rate-limit');
 const database = require('./database'); // 立即导入
 
 const app = express();
-const homeworkRoutes = require('./routes'); // 使用更清晰的命名
-
 app.use('/api', homeworkRoutes); // 使用/api前缀
 
 
