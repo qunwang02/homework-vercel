@@ -48,21 +48,13 @@
         .tab-content { display: none; }
         .tab-content.active { display: block; }
         .data-actions { margin-bottom: 15px; }
-        .nav-links { text-align: center; margin: 20px 0; }
-        .nav-links a { color: #4CAF50; text-decoration: none; font-weight: bold; padding: 10px 20px; border: 2px solid #4CAF50; border-radius: 5px; margin: 0 10px; }
-        .nav-links a:hover { background: #4CAF50; color: white; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>功课收集系统</h1>
-            <p>Node.js + MongoDB + Render 部署</p>
-        </div>
-        
-        <div class="nav-links">
-            <a href="/">提交功课</a>
-            <a href="/manage">数据管理</a>
+            <p>云端存储版 - 数据自动保存到云端</p>
         </div>
         
         <div class="content">
@@ -74,7 +66,7 @@
             
             <!-- 提交功课标签页 -->
             <div id="submit-tab" class="tab-content active">
-                <div class="grid">
+                <div class="form-group">
                     <div>
                         <div id="cloudStatus" class="cloud-status online">
                             <span id="statusIcon">🌐</span> <span id="statusText">云端连接正常</span>
@@ -215,11 +207,10 @@
                         
                         <div class="stats" style="margin-top: 20px;">
                             <h3>💡 功能介绍</h3>
-                            <p><strong>云端存储：</strong>数据保存到MongoDB数据库</p>
+                            <p><strong>云端存储：</strong>数据保存到Notion数据库</p>
                             <p><strong>本地备份：</strong>数据同时保存在浏览器中</p>
                             <p><strong>离线使用：</strong>网络异常时可使用本地模式</p>
                             <p><strong>数据导出：</strong>支持导出为CSV格式</p>
-                            <p><strong>数据管理：</strong><a href="/manage">点击这里进入管理页面</a></p>
                         </div>
                     </div>
                 </div>
@@ -257,6 +248,7 @@
                     <h3>🌐 云端连接</h3>
                     <p id="cloudStatusDetail">状态: 检测中...</p>
                     <p id="cloudApiStatus">API: 检测中...</p>
+                    <p id="cloudConfigStatus">配置: 检测中...</p>
                 </div>
                 
                 <div class="stats" style="margin-top: 20px;">
@@ -277,8 +269,10 @@
     </div>
 
     <script>
-        // API端点配置 - 使用相对路径
-        const API_BASE_URL = '/api';
+        // API端点配置 - 部署后需要修改为你的Vercel域名
+        const API_BASE_URL = window.location.origin.includes('localhost') 
+            ? 'http://localhost:3000/api' 
+            : 'api'; // 修改为你的Vercel域名
         
         let cloudStats = {
             submitCount: 0,
@@ -315,26 +309,79 @@
         });
         
         // 切换标签页
-        function switchTab(tabName) {
-            // 隐藏所有标签页
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            
-            // 显示选中的标签页
-            document.getElementById(tabName + '-tab').classList.add('active');
-            document.querySelector(`[onclick="switchTab('${tabName}')"]`).classList.add('active');
-            
-            // 如果是数据标签页，刷新数据
-            if (tabName === 'data') {
-                loadLocalData();
-            } else if (tabName === 'cloud') {
-                updateCloudStatus();
-            }
-        }
+        function initTabSystem() {
+			const tabs = {
+				'submit': {
+					content: document.getElementById('submit-tab'),
+					button: document.querySelector('[onclick*="switchTab(\'submit\')"]')
+				},
+				'data': {
+					content: document.getElementById('data-tab'),
+					button: document.querySelector('[onclick*="switchTab(\'data\')"]')
+				},
+				'cloud': {
+					content: document.getElementById('cloud-tab'),
+					button: document.querySelector('[onclick*="switchTab(\'cloud\')"]')
+				}
+			};
+			
+			// 移除原有的onclick属性，添加新的事件监听
+			Object.keys(tabs).forEach(tabName => {
+				const tab = tabs[tabName];
+				if (tab.button) {
+					// 移除旧的onclick
+					tab.button.removeAttribute('onclick');
+					
+					// 添加新的事件监听
+					tab.button.addEventListener('click', function(e) {
+						e.preventDefault();
+						
+						// 隐藏所有标签页
+						Object.values(tabs).forEach(t => {
+							if (t.content) {
+								t.content.style.display = 'none';
+								t.content.classList.remove('active');
+							}
+							if (t.button) {
+								t.button.classList.remove('active');
+							}
+						});
+						
+						// 显示当前标签页
+						if (tab.content) {
+							tab.content.style.display = 'block';
+							tab.content.classList.add('active');
+						}
+						if (tab.button) {
+							tab.button.classList.add('active');
+						}
+						
+						// 执行特定操作
+						if (tabName === 'data') {
+							setTimeout(() => loadLocalData(), 100);
+						} else if (tabName === 'cloud') {
+							setTimeout(() => updateCloudStatus(), 100);
+						}
+					});
+				}
+			});
+			
+			// 初始化显示第一个标签页
+			if (tabs.submit.content) {
+				tabs.submit.content.style.display = 'block';
+			}
+			if (tabs.submit.button) {
+				tabs.submit.button.classList.add('active');
+			}
+		}
+
+		// 在DOM加载后初始化
+		document.addEventListener('DOMContentLoaded', function() {
+			// 原有的初始化代码...
+			
+			// 添加标签页系统初始化
+			setTimeout(initTabSystem, 100);
+		});
         
         // 更新存储模式显示
         function updateStorageModeText() {
@@ -351,7 +398,7 @@
         // 测试API连接
         async function testApiConnection() {
             try {
-                const response = await fetch(`${API_BASE_URL}/health`, {
+                const response = await fetch(`${API_BASE_URL}/config`, {
                     method: 'GET'
                 });
                 
@@ -366,7 +413,7 @@
                     
                     // 更新云端状态
                     document.getElementById('cloudApiStatus').textContent = 'API: ✅ 正常';
-                    document.getElementById('cloudStatusDetail').textContent = '状态: ✅ 正常';
+                    document.getElementById('cloudConfigStatus').textContent = '配置: ✅ 已配置';
                 } else {
                     updateApiStatusError();
                 }
@@ -384,7 +431,7 @@
             
             // 更新云端状态
             document.getElementById('cloudApiStatus').textContent = 'API: ❌ 失败';
-            document.getElementById('cloudStatusDetail').textContent = '状态: ❌ 失败';
+            document.getElementById('cloudConfigStatus').textContent = '配置: ❌ 未配置';
         }
         
         // 提交记录
@@ -696,7 +743,7 @@
         // 测试云端连接
         async function testCloudConnection() {
             try {
-                const response = await fetch(`${API_BASE_URL}/health`, {
+                const response = await fetch(`${API_BASE_URL}/config`, {
                     method: 'GET'
                 });
                 
@@ -764,6 +811,61 @@
                 }, 5000);
             }
         }
+		// 手动绑定所有按钮
+function bindAllButtons() {
+    const dataTab = document.getElementById('data-tab');
+    if (!dataTab) return false;
+    
+    const buttons = dataTab.querySelectorAll('button');
+    let boundCount = 0;
+    
+    buttons.forEach(btn => {
+        const text = btn.textContent;
+        
+        // 根据按钮文本绑定不同功能
+        if (text.includes('刷新数据') || btn.className.includes('btn-primary')) {
+            btn.onclick = () => {
+                console.log('点击：刷新数据');
+                if (typeof loadLocalData === 'function') loadLocalData();
+                else alert('loadLocalData函数不存在');
+            };
+            boundCount++;
+        }
+        else if (text.includes('导出CSV') || btn.className.includes('btn-secondary')) {
+            btn.onclick = () => {
+                console.log('点击：导出CSV');
+                if (typeof exportLocalData === 'function') exportLocalData();
+                else alert('exportLocalData函数不存在');
+            };
+            boundCount++;
+        }
+        else if (text.includes('清空本地数据') || btn.className.includes('btn-danger')) {
+            btn.onclick = () => {
+                console.log('点击：清空数据');
+                if (typeof clearLocalData === 'function') {
+                    if (confirm('确定清空所有本地数据？')) clearLocalData();
+                } else {
+                    alert('clearLocalData函数不存在');
+                }
+            };
+            boundCount++;
+        }
+        else if (text.includes('上传到云端') || btn.className.includes('btn-success')) {
+            btn.onclick = () => {
+                console.log('点击：上传到云端');
+                if (typeof uploadToCloud === 'function') uploadToCloud();
+                else alert('uploadToCloud函数不存在');
+            };
+            boundCount++;
+        }
+    });
+    
+    console.log(`✅ 成功绑定 ${boundCount} 个按钮`);
+    return true;
+}
+
+// 执行绑定
+bindAllButtons();
     </script>
 </body>
 </html>
