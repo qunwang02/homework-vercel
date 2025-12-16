@@ -270,16 +270,10 @@
 
     <script>
         // API端点配置 - 部署后需要修改为你的Vercel域名
-		let API_BASE_URL;
-		const currentHost = window.location.hostname;
-		
-		if (currentHost === 'localhost' || currentHost.startsWith('192.')) { // 本地开发[citation:2]
-		    API_BASE_URL = 'http://localhost:3000/api';
-		} else if (currentHost.includes('onrender.com')) { // 在生产环境（Render平台）
-		    API_BASE_URL = `https://homework-collection-system-1.onrender.com/api`;
-		} else { // 其他自定义域名
-		    API_BASE_URL = `https://your-custom-domain.com/api`; // 替换为你的自定义域名
-		}
+		const API_BASE_URL = window.location.origin.includes('localhost') 
+		    ? 'http://localhost:3000/api' 
+		    : 'https://homework-collection-system-1.onrender.com/api'; // ✅ 修改为您的完整后端地址
+
         
         let cloudStats = {
             submitCount: 0,
