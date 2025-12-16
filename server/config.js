@@ -6,8 +6,6 @@ const config = {
     uri: process.env.MONGODB_URI,
     database: process.env.DATABASE_NAME || 'donation_system',
     options: {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
       serverApi: {
         version: '1',
         strict: true,
