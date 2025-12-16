@@ -235,7 +235,7 @@
         // API配置 - 修改这里
         // 原代码：const API_BASE_URL = 'https://homework-api.nanmo009.workers.dev/api';
         // 改为使用相对路径，因为管理页面和API在同一个域名下
-        const API_BASE_URL = '/api';
+       const API_BASE_URL = window.location.origin + '/api';
         
         // 全局变量
         let allRecords = [];
@@ -250,6 +250,9 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadStats();
             loadRecords();
+	    
+		    // 测试API连接
+			testApiConnection();
             
             // 设置默认日期为今天
             document.getElementById('searchDate').value = new Date().toISOString().split('T')[0];
@@ -297,6 +300,21 @@
             }
         }
         
+		// 添加API连接测试函数
+		async function testApiConnection() {
+			try {
+				const response = await fetch(`${API_BASE_URL}/test`);
+				const data = await response.json();
+				if (data.success) {
+					console.log('API连接正常');
+				} else {
+					showMessage('API连接异常: ' + (data.error || '未知错误'), 'error');
+				}
+			} catch (error) {
+				showMessage('无法连接到API服务器，请检查网络连接', 'error');
+			}
+		}
+		
         // 加载记录
         async function loadRecords() {
             showLoading(true);
@@ -966,6 +984,87 @@
         function closeStatsModal() {
             document.getElementById('statsModal').style.display = 'none';
         }
+
+// 一键修复所有按钮（复制到控制台运行）
+(() => {
+    console.log('🚀 开始修复CSP按钮问题...');
+    
+    // 移除所有onclick属性并重新绑定
+    document.querySelectorAll('[onclick]').forEach(el => {
+        const onclick = el.getAttribute('onclick');
+        if (!onclick) return;
+        
+        console.log(`修复: ${el.textContent || el.className}`);
+        el.removeAttribute('onclick');
+        
+        // 解析并绑定函数
+        const funcMatch = onclick.match(/(\w+)\(\)/);
+        const setViewMatch = onclick.match(/setViewMode\('([^']+)'\)/);
+        const changePageMatch = onclick.match(/changePage\((\d+)\)/);
+        const editMatch = onclick.match(/editRecord\('([^']+)'\)/);
+        const deleteMatch = onclick.match(/deleteRecord\('([^']+)'\)/);
+        const closeMatch = onclick.match(/close(Modal|StatsModal)\(\)/);
+        
+        if (funcMatch) {
+            const func = funcMatch[1];
+            el.addEventListener('click', e => {
+                e.preventDefault();
+                if (window[func] && typeof window[func] === 'function') {
+                    window[func]();
+                }
+            });
+        } else if (setViewMatch) {
+            const mode = setViewMatch[1];
+            el.addEventListener('click', e => {
+                e.preventDefault();
+                if (window.setViewMode) window.setViewMode(mode);
+            });
+        } else if (changePageMatch) {
+            const page = changePageMatch[1];
+            el.addEventListener('click', e => {
+                e.preventDefault();
+                if (window.changePage) window.changePage(parseInt(page));
+            });
+        } else if (editMatch || deleteMatch) {
+            // 这些会在稍后处理
+            el.dataset.originalOnclick = onclick;
+        } else if (closeMatch) {
+            const func = closeMatch[1] === 'Modal' ? 'closeModal' : 'closeStatsModal';
+            el.addEventListener('click', e => {
+                e.preventDefault();
+                if (window[func]) window[func]();
+            });
+        }
+    });
+    
+    // 添加事件委托处理动态按钮
+    document.addEventListener('click', e => {
+        const target = e.target;
+        const onclick = target.getAttribute('onclick');
+        
+        if (onclick && onclick.includes('editRecord')) {
+            e.preventDefault();
+            const match = onclick.match(/editRecord\('([^']+)'\)/);
+            if (match && window.editRecord) window.editRecord(match[1]);
+        }
+        
+        if (onclick && onclick.includes('deleteRecord')) {
+            e.preventDefault();
+            const match = onclick.match(/deleteRecord\('([^']+)'\)/);
+            if (match && window.deleteRecord) window.deleteRecord(match[1]);
+        }
+        
+        if (onclick && onclick.includes('toggleSelection')) {
+            e.preventDefault();
+            const match = onclick.match(/toggleSelection\('([^']+)'\)/);
+            if (match && window.toggleSelection) window.toggleSelection(match[1]);
+        }
+    });
+    
+    console.log('✅ 修复完成！现在按钮应该可以正常工作了。');
+
+})();
+
     </script>
 </body>
 </html>
