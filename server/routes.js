@@ -18,32 +18,6 @@ async function ensureDatabase(req, res, next) {
   }
 }
 
-const homeworkController = require('../controllers/homeworkController');
-
-// 定义路由
-
-// API根路径
-router.get('/', (req, res) => {
-    res.json({ success: true, message: '欢迎使用功课收集系统API' });
-});
-
-// 提交功课
-router.post('/homeworks', homeworkController.submitHomework);
-
-// 获取所有功课
-router.get('/homeworks', homeworkController.getAllHomeworks);
-
-// 根据ID获取功课
-router.get('/homeworks/:id', homeworkController.getHomeworkById);
-
-// 更新功课状态
-router.put('/homeworks/:id/status', homeworkController.updateHomeworkStatus);
-
-// 删除功课
-router.delete('/homeworks/:id', homeworkController.deleteHomework);
-
-module.exports = router;
-
 // 提交功课记录
 router.post('/submit', ensureDatabase, async (req, res) => {
   try {
