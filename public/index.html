@@ -59,9 +59,9 @@
         
         <div class="content">
             <div class="tabs">
-                <button class="tab active" onclick="switchTab('submit')">提交功课</button>
-                <button class="tab" onclick="switchTab('data')">本地数据管理</button>
-                <button class="tab" onclick="switchTab('cloud')">云端状态</button>
+                <button class="tab active" data-tab="submit">提交功课</button>
+                <button class="tab" data-tab="data">本地数据管理</button>
+                <button class="tab" data-tab="cloud">云端状态</button>
             </div>
             
             <!-- 提交功课标签页 -->
@@ -83,10 +83,8 @@
                                 <label>姓名 *</label>
                                 <input type="text" id="name" required placeholder="请输入您的姓名">
                             </div>
-                            <div class="form-group">
-                                <label>联系方式（可选）</label>
-                                <input type="text" id="contact" placeholder="手机号/微信号/邮箱（方便联系）">
-                            </div>
+                            <!-- 移除了联系方式字段 -->
+                            
                             <div class="form-group">
                                 <label>九字禅（声）</label>
                                 <input type="number" id="nineWord" min="0" value="0">
@@ -104,7 +102,7 @@
                                 <input type="number" id="activeZen" min="0" value="0">
                             </div>
                             
-                            <!-- 经典诵读部分 -->
+                            <!-- 经典诵读部分 - 增加药师佛经 -->
                             <div class="form-group">
                                 <label>经典诵读（遍）</label>
                                 
@@ -160,6 +158,18 @@
                                         <label class="radio-option"><input type="radio" name="dizang" value="2"> 2遍</label>
                                         <label class="radio-option"><input type="radio" name="dizang" value="3"> 3遍</label>
                                         <label class="radio-option"><input type="radio" name="dizang" value="4"> 4遍</label>
+                                    </div>
+                                </div>
+                                
+                                <!-- 新增：药师佛经 -->
+                                <div class="classic-section">
+                                    <div class="classic-title">药师琉璃光如来本愿功德经</div>
+                                    <div class="radio-group">
+                                        <label class="radio-option"><input type="radio" name="yaoshi" value="0" checked> 0遍</label>
+                                        <label class="radio-option"><input type="radio" name="yaoshi" value="1"> 1遍</label>
+                                        <label class="radio-option"><input type="radio" name="yaoshi" value="2"> 2遍</label>
+                                        <label class="radio-option"><input type="radio" name="yaoshi" value="3"> 3遍</label>
+                                        <label class="radio-option"><input type="radio" name="yaoshi" value="4"> 4遍</label>
                                     </div>
                                 </div>
                             </div>
@@ -222,10 +232,10 @@
                 <p>此页面数据保存在您的浏览器本地存储中，清除浏览器数据会丢失这些记录。</p>
                 
                 <div class="data-actions">
-                    <button onclick="loadLocalData()" class="btn-primary">刷新数据</button>
-                    <button onclick="exportLocalData()" class="btn-secondary">导出CSV</button>
-                    <button onclick="clearLocalData()" class="btn-danger">清空本地数据</button>
-                    <button onclick="uploadToCloud()" class="btn-success">上传到云端</button>
+                    <button id="refreshData" class="btn-primary">刷新数据</button>
+                    <button id="exportData" class="btn-secondary">导出CSV</button>
+                    <button id="clearData" class="btn-danger">清空本地数据</button>
+                    <button id="uploadCloud" class="btn-success">上传到云端</button>
                 </div>
                 
                 <div id="localDataDisplay">
@@ -259,8 +269,8 @@
                 </div>
                 
                 <div style="margin-top: 20px;">
-                    <button onclick="testCloudConnection()" class="btn-primary">测试云端连接</button>
-                    <button onclick="syncAllToCloud()" class="btn-success">同步全部到云端</button>
+                    <button id="testCloud" class="btn-primary">测试云端连接</button>
+                    <button id="syncAll" class="btn-success">同步全部到云端</button>
                 </div>
                 
                 <div id="cloudResult" class="alert" style="margin-top: 20px;"></div>
@@ -269,12 +279,11 @@
     </div>
 
     <script>
-        // API端点配置 - 部署后需要修改为你的Vercel域名
-		const API_BASE_URL = window.location.origin.includes('localhost') 
-		    ? 'https://homework-collection-system-1.onrender.com/api'; // ✅ 修改为您的完整后端地址
-		    : 'http://localhost:3000/api' 
-
-        
+     
+       const API_BASE_URL = window.location.origin.includes('localhost') 
+        ? 'http://localhost:3000/api' 
+         : window.location.origin + '/api';
+            
         let cloudStats = {
             submitCount: 0,
             lastSubmit: null,
@@ -282,9 +291,14 @@
         };
         
         document.addEventListener('DOMContentLoaded', function() {
-            // 设置默认日期为今天
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('date').value = today;
+            // 设置默认日期为昨天
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = yesterday.toISOString().split('T')[0];
+            document.getElementById('date').value = yesterdayStr;
+            
+            // 初始化标签页系统
+            initTabSystem();
             
             // 测试API连接
             testApiConnection();
@@ -295,94 +309,57 @@
                 submitRecord();
             });
             
-            // 加载本地数据
-            loadLocalData();
+            // 按钮事件绑定
+            document.getElementById('refreshData').addEventListener('click', loadLocalData);
+            document.getElementById('exportData').addEventListener('click', exportLocalData);
+            document.getElementById('clearData').addEventListener('click', clearLocalData);
+            document.getElementById('uploadCloud').addEventListener('click', uploadToCloud);
+            document.getElementById('testCloud').addEventListener('click', testCloudConnection);
+            document.getElementById('syncAll').addEventListener('click', syncAllToCloud);
+            
+            // 重置按钮
+            document.querySelector('button[type="reset"]').addEventListener('click', function() {
+                document.getElementById('date').value = yesterdayStr;
+            });
             
             // 监听存储模式变化
-            document.getElementById('storageMode').addEventListener('change', function() {
-                updateStorageModeText();
-            });
+            document.getElementById('storageMode').addEventListener('change', updateStorageModeText);
             
             updateStorageModeText();
             
             // 初始化云端统计
             loadCloudStats();
+            
+            // 加载本地数据
+            loadLocalData();
         });
         
-        // 切换标签页
+        // 标签页系统
         function initTabSystem() {
-			const tabs = {
-				'submit': {
-					content: document.getElementById('submit-tab'),
-					button: document.querySelector('[onclick*="switchTab(\'submit\')"]')
-				},
-				'data': {
-					content: document.getElementById('data-tab'),
-					button: document.querySelector('[onclick*="switchTab(\'data\')"]')
-				},
-				'cloud': {
-					content: document.getElementById('cloud-tab'),
-					button: document.querySelector('[onclick*="switchTab(\'cloud\')"]')
-				}
-			};
-			
-			// 移除原有的onclick属性，添加新的事件监听
-			Object.keys(tabs).forEach(tabName => {
-				const tab = tabs[tabName];
-				if (tab.button) {
-					// 移除旧的onclick
-					tab.button.removeAttribute('onclick');
-					
-					// 添加新的事件监听
-					tab.button.addEventListener('click', function(e) {
-						e.preventDefault();
-						
-						// 隐藏所有标签页
-						Object.values(tabs).forEach(t => {
-							if (t.content) {
-								t.content.style.display = 'none';
-								t.content.classList.remove('active');
-							}
-							if (t.button) {
-								t.button.classList.remove('active');
-							}
-						});
-						
-						// 显示当前标签页
-						if (tab.content) {
-							tab.content.style.display = 'block';
-							tab.content.classList.add('active');
-						}
-						if (tab.button) {
-							tab.button.classList.add('active');
-						}
-						
-						// 执行特定操作
-						if (tabName === 'data') {
-							setTimeout(() => loadLocalData(), 100);
-						} else if (tabName === 'cloud') {
-							setTimeout(() => updateCloudStatus(), 100);
-						}
-					});
-				}
-			});
-			
-			// 初始化显示第一个标签页
-			if (tabs.submit.content) {
-				tabs.submit.content.style.display = 'block';
-			}
-			if (tabs.submit.button) {
-				tabs.submit.button.classList.add('active');
-			}
-		}
-
-		// 在DOM加载后初始化
-		document.addEventListener('DOMContentLoaded', function() {
-			// 原有的初始化代码...
-			
-			// 添加标签页系统初始化
-			setTimeout(initTabSystem, 100);
-		});
+            const tabs = document.querySelectorAll('.tab');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            tabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabId = this.getAttribute('data-tab');
+                    
+                    // 移除所有active类
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tabContents.forEach(c => c.classList.remove('active'));
+                    
+                    // 添加active类到当前标签
+                    this.classList.add('active');
+                    document.getElementById(`${tabId}-tab`).classList.add('active');
+                    
+                    // 执行标签页特定操作
+                    if (tabId === 'data') {
+                        setTimeout(loadLocalData, 100);
+                    } else if (tabId === 'cloud') {
+                        setTimeout(updateCloudStatus, 100);
+                    }
+                });
+            });
+        }
         
         // 更新存储模式显示
         function updateStorageModeText() {
@@ -440,17 +417,18 @@
             const record = {
                 date: document.getElementById('date').value,
                 name: document.getElementById('name').value.trim(),
-                contact: document.getElementById('contact').value.trim(),
                 nineWord: parseInt(document.getElementById('nineWord').value) || 0,
                 buddhaWorship: parseInt(document.getElementById('buddhaWorship').value) || 0,
                 quietZen: parseInt(document.getElementById('quietZen').value) || 0,
                 activeZen: parseInt(document.getElementById('activeZen').value) || 0,
-                diamond: parseInt(document.querySelector('input[name="diamond"]:checked').value),
-                amitabha: parseInt(document.querySelector('input[name="amitabha"]:checked').value),
-                guanyin: parseInt(document.querySelector('input[name="guanyin"]:checked').value),
-                puxian: parseInt(document.querySelector('input[name="puxian"]:checked').value),
-                dizang: parseInt(document.querySelector('input[name="dizang"]:checked').value),
+                diamond: parseInt(document.querySelector('input[name="diamond"]:checked').value) || 0,
+                amitabha: parseInt(document.querySelector('input[name="amitabha"]:checked').value) || 0,
+                guanyin: parseInt(document.querySelector('input[name="guanyin"]:checked').value) || 0,
+                puxian: parseInt(document.querySelector('input[name="puxian"]:checked').value) || 0,
+                dizang: parseInt(document.querySelector('input[name="dizang"]:checked').value) || 0,
+                yaoshi: parseInt(document.querySelector('input[name="yaoshi"]:checked').value) || 0,
                 remark: document.getElementById('remark').value.trim(),
+                deviceId: 'web',
                 submitTime: new Date().toLocaleString('zh-CN'),
                 submitTimestamp: Date.now(),
                 storageMode: document.getElementById('storageMode').value
@@ -462,7 +440,9 @@
                 return;
             }
             
-            const classicsTotal = record.diamond + record.amitabha + record.guanyin + record.puxian + record.dizang;
+            // 计算经典总数（包含药师佛经）
+            const classicsTotal = record.diamond + record.amitabha + record.guanyin + 
+                                record.puxian + record.dizang + record.yaoshi;
             let resultMessage = '';
             let success = false;
             
@@ -525,10 +505,13 @@
                     loadLocalData();
                     updateCloudStatus();
                     
-                    // 清空表单
+                    // 清空表单（保留日期）
                     setTimeout(() => {
                         document.getElementById('homeworkForm').reset();
-                        document.getElementById('date').value = new Date().toISOString().split('T')[0];
+                        // 设置日期为昨天
+                        const yesterday = new Date();
+                        yesterday.setDate(yesterday.getDate() - 1);
+                        document.getElementById('date').value = yesterday.toISOString().split('T')[0];
                         document.getElementById('nineWord').value = 0;
                         document.getElementById('buddhaWorship').value = 0;
                         document.getElementById('quietZen').value = 0;
@@ -601,11 +584,13 @@
             }
             
             let html = '<table class="data-table">';
-            html += '<tr><th>日期</th><th>姓名</th><th>九字禅</th><th>拜忏文</th><th>静禅</th><th>动禅</th><th>金刚经</th><th>阿弥陀经</th><th>普门品</th><th>普贤品</th><th>地藏经</th><th>经典总数</th><th>存储方式</th><th>提交时间</th></tr>';
+            html += '<tr><th>日期</th><th>姓名</th><th>九字禅</th><th>拜忏文</th><th>静禅</th><th>动禅</th><th>金刚经</th><th>阿弥陀经</th><th>普门品</th><th>普贤品</th><th>地藏经</th><th>药师经</th><th>经典总数</th><th>存储方式</th><th>提交时间</th></tr>';
             
             // 显示最近20条记录
             records.slice(-20).reverse().forEach(record => {
-                const total = record.diamond + record.amitabha + record.guanyin + record.puxian + record.dizang;
+                // 计算经典总数（包含药师佛经）
+                const total = (record.diamond || 0) + (record.amitabha || 0) + (record.guanyin || 0) + 
+                             (record.puxian || 0) + (record.dizang || 0) + (record.yaoshi || 0);
                 let storageModeText = '';
                 switch(record.storageMode) {
                     case 'both': storageModeText = '🌐+💾'; break;
@@ -618,15 +603,16 @@
                     <tr>
                         <td>${record.date}</td>
                         <td>${record.name}</td>
-                        <td>${record.nineWord}</td>
-                        <td>${record.buddhaWorship}</td>
-                        <td>${record.quietZen}</td>
-                        <td>${record.activeZen}</td>
-                        <td>${record.diamond}</td>
-                        <td>${record.amitabha}</td>
-                        <td>${record.guanyin}</td>
-                        <td>${record.puxian}</td>
-                        <td>${record.dizang}</td>
+                        <td>${record.nineWord || 0}</td>
+                        <td>${record.buddhaWorship || 0}</td>
+                        <td>${record.quietZen || 0}</td>
+                        <td>${record.activeZen || 0}</td>
+                        <td>${record.diamond || 0}</td>
+                        <td>${record.amitabha || 0}</td>
+                        <td>${record.guanyin || 0}</td>
+                        <td>${record.puxian || 0}</td>
+                        <td>${record.dizang || 0}</td>
+                        <td>${record.yaoshi || 0}</td>
                         <td><strong>${total}</strong></td>
                         <td>${storageModeText}</td>
                         <td>${record.submitTime}</td>
@@ -648,11 +634,13 @@
             }
             
             // CSV格式
-            let csv = '日期,姓名,联系方式,九字禅(声),拜忏文(遍),静禅(分钟),动禅(分钟),金刚经,阿弥陀经,普门品,普贤品,地藏经,经典总数,备注,提交时间,存储方式\n';
+            let csv = '日期,姓名,九字禅(声),拜忏文(遍),静禅(分钟),动禅(分钟),金刚经,阿弥陀经,普门品,普贤品,地藏经,药师经,经典总数,备注,提交时间,存储方式\n';
             
             records.forEach(record => {
-                const total = record.diamond + record.amitabha + record.guanyin + record.puxian + record.dizang;
-                csv += `${record.date},${record.name},${record.contact || ''},${record.nineWord},${record.buddhaWorship},${record.quietZen},${record.activeZen},${record.diamond},${record.amitabha},${record.guanyin},${record.puxian},${record.dizang},${total},"${record.remark || ''}",${record.submitTime},${record.storageMode || 'local'}\n`;
+                // 计算经典总数（包含药师佛经）
+                const total = (record.diamond || 0) + (record.amitabha || 0) + (record.guanyin || 0) + 
+                             (record.puxian || 0) + (record.dizang || 0) + (record.yaoshi || 0);
+                csv += `${record.date},${record.name},${record.nineWord},${record.buddhaWorship},${record.quietZen},${record.activeZen},${record.diamond},${record.amitabha},${record.guanyin},${record.puxian},${record.dizang},${record.yaoshi || 0},${total},"${record.remark || ''}",${record.submitTime},${record.storageMode || 'local'}\n`;
             });
             
             // 下载CSV
@@ -744,7 +732,7 @@
         // 测试云端连接
         async function testCloudConnection() {
             try {
-                const response = await fetch(`${API_BASE_URL}/config`, {
+                const response = await fetch(`${API_BASE_URL}/test`, {
                     method: 'GET'
                 });
                 
@@ -795,13 +783,8 @@
         function showResult(message, type, elementId = 'result') {
             const resultDiv = document.getElementById(elementId);
             
-            if (typeof message === 'string' && !message.includes('<')) {
-                resultDiv.innerHTML = message;
-                resultDiv.className = `alert alert-${type}`;
-            } else {
-                resultDiv.innerHTML = message;
-                resultDiv.className = `alert alert-${type}`;
-            }
+            resultDiv.innerHTML = message;
+            resultDiv.className = `alert alert-${type}`;
             
             resultDiv.style.display = 'block';
             
@@ -812,61 +795,6 @@
                 }, 5000);
             }
         }
-		// 手动绑定所有按钮
-function bindAllButtons() {
-    const dataTab = document.getElementById('data-tab');
-    if (!dataTab) return false;
-    
-    const buttons = dataTab.querySelectorAll('button');
-    let boundCount = 0;
-    
-    buttons.forEach(btn => {
-        const text = btn.textContent;
-        
-        // 根据按钮文本绑定不同功能
-        if (text.includes('刷新数据') || btn.className.includes('btn-primary')) {
-            btn.onclick = () => {
-                console.log('点击：刷新数据');
-                if (typeof loadLocalData === 'function') loadLocalData();
-                else alert('loadLocalData函数不存在');
-            };
-            boundCount++;
-        }
-        else if (text.includes('导出CSV') || btn.className.includes('btn-secondary')) {
-            btn.onclick = () => {
-                console.log('点击：导出CSV');
-                if (typeof exportLocalData === 'function') exportLocalData();
-                else alert('exportLocalData函数不存在');
-            };
-            boundCount++;
-        }
-        else if (text.includes('清空本地数据') || btn.className.includes('btn-danger')) {
-            btn.onclick = () => {
-                console.log('点击：清空数据');
-                if (typeof clearLocalData === 'function') {
-                    if (confirm('确定清空所有本地数据？')) clearLocalData();
-                } else {
-                    alert('clearLocalData函数不存在');
-                }
-            };
-            boundCount++;
-        }
-        else if (text.includes('上传到云端') || btn.className.includes('btn-success')) {
-            btn.onclick = () => {
-                console.log('点击：上传到云端');
-                if (typeof uploadToCloud === 'function') uploadToCloud();
-                else alert('uploadToCloud函数不存在');
-            };
-            boundCount++;
-        }
-    });
-    
-    console.log(`✅ 成功绑定 ${boundCount} 个按钮`);
-    return true;
-}
-
-// 执行绑定
-bindAllButtons();
     </script>
 </body>
 </html>
