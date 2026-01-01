@@ -1,10 +1,10 @@
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
-const path = require('path');
-const rateLimit = require('express-rate-limit');
-const database = require('./database');
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import path from 'path';
+import rateLimit from 'express-rate-limit';
+import database from './database.js';
 
 const app = express();
 
@@ -57,9 +57,12 @@ app.use((req, res, next) => {
 
 // 加载API路由
 try {
-  const routes = require('./routes');
-  app.use('/api', routes);
-  console.log('✅ API路由已加载');
+  import('./routes.js').then((routesModule) => {
+    app.use('/api', routesModule.default);
+    console.log('✅ API路由已加载');
+  }).catch((error) => {
+    console.error('❌ 加载API路由失败:', error);
+  });
 } catch (error) {
   console.error('❌ 加载API路由失败:', error);
 }
@@ -113,74 +116,7 @@ app.get('/api/check-data', async (req, res) => {
   }
 });
 
-// 统计信息 - 支持日期范围
-app.get('/api/stats', async (req, res) => {
-  try {
-    const { startDate, endDate } = req.query;
-    const client = await connectToMongoDB();
-    const db = client.db(DB_NAME);
-    const collection = db.collection(COLLECTION_NAME);
-    
-    // 构建查询条件
-    const query = {};
-    if (startDate && endDate) {
-      query.date = { $gte: startDate, $lte: endDate };
-    } else if (startDate) {
-      query.date = { $gte: startDate };
-    } else if (endDate) {
-      query.date = { $lte: endDate };
-    }
-    
-    const total = await collection.countDocuments(query);
-    const today = new Date().toISOString().split('T')[0];
-    const todayCount = await collection.countDocuments({ date: today });
-    
-    // 按姓名统计
-    const nameStats = await collection.aggregate([
-      { $match: query },
-      {
-        $group: {
-          _id: '$name',
-          count: { $sum: 1 },
-          lastSubmit: { $max: '$submitTime' },
-        },
-      },
-      { $sort: { count: -1 } },
-    ]).toArray();
-    
-    // 经典诵读统计
-    const classicsStats = await collection.aggregate([
-      { $match: query },
-      {
-        $group: {
-          _id: null,
-          totalDiamond: { $sum: { $toInt: '$diamond' } },
-          totalAmitabha: { $sum: { $toInt: '$amitabha' } },
-          totalGuanyin: { $sum: { $toInt: '$guanyin' } },
-          totalPuxian: { $sum: { $toInt: '$puxian' } },
-          totalDizang: { $sum: { $toInt: '$dizang' } },
-        },
-      },
-    ]).toArray();
-    
-    res.json({
-      success: true,
-      stats: {
-        totalRecords: total,
-        todayRecords: todayCount,
-        nameStats,
-        classicsStats: classicsStats[0] || {},
-      },
-    });
-  } catch (error) {
-    console.error('统计失败:', error);
-    res.status(500).json({
-      success: false,
-      error: '统计失败',
-      details: error.message
-    });
-  }
-});
+
 
 // 测试插入路由
 app.post('/api/test-insert', async (req, res) => {
